@@ -1,0 +1,21 @@
+# .gitignore
+
+# Entorno virtual
+venv/
+
+# Archivo de variables de entorno con secretos
+.env
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de configuración de IDEs (opcional pero recomendado)
+.idea/
+.vscode/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
