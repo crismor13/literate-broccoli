@@ -6,6 +6,12 @@ from app.adapters.repositories.agent_repository import AgentRepository
 from app.adapters.repositories.storage_repository import StorageRepository
 from fastapi import BackgroundTasks 
 from .rag_processor import process_and_embed_document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
+from langchain_core.output_parsers import StrOutputParser
+from langchain_openai import ChatOpenAI
+from app.infrastructure.vector_store import get_vector_store
+from app.core.domain.agent_model import ChatQuery, ChatResponse
 
 class AgentService:
     def __init__(self, agent_repo: AgentRepository, storage_repo: StorageRepository):
@@ -80,3 +86,54 @@ class AgentService:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete agent from database")
             
         return {"message": "Agent and associated files deleted successfully"}
+    
+    async def chat_with_agent(self, agent_id: str, chat_query: ChatQuery) -> ChatResponse:
+        agent = await self.get_agent_by_id(agent_id)
+        vector_store = get_vector_store()
+
+        # 1. Creamos un "retriever" que filtra por el ID del agente. ¡Esto es CRUCIAL!
+        retriever = vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={'k': 3, 'filter': {'agent_id': agent_id}}
+        )
+
+        # 2. Definimos el prompt template usando el prompt del agente
+        template = f"""
+        System Prompt: {agent.prompt}
+
+        Usa la siguiente información de contexto para responder la pregunta.
+        Si no sabes la respuesta, simplemente di que no la sabes. No intentes inventar una respuesta.
+        Mantén la respuesta concisa y relevante.
+
+        Contexto:
+        {{context}}
+
+        Pregunta:
+        {{question}}
+
+        Respuesta útil:
+        """
+        prompt = ChatPromptTemplate.from_template(template)
+
+        # 3. Inicializamos el modelo de lenguaje
+        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+
+        # 4. Construimos la cadena (chain) con LangChain Expression Language (LCEL)
+        def format_docs(docs):
+            return "\n\n".join(doc.page_content for doc in docs)
+
+        rag_chain = (
+            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+
+        # 5. Invocamos la cadena para obtener la respuesta
+        answer = rag_chain.invoke(chat_query.query)
+
+        # (Opcional pero recomendado) Obtenemos las fuentes para dar más contexto
+        retrieved_docs = retriever.invoke(chat_query.query)
+        sources = list(set([doc.metadata.get("source", "unknown") for doc in retrieved_docs]))
+
+        return ChatResponse(answer=answer, retrieved_sources=sources)
