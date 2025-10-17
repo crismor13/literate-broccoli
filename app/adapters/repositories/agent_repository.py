@@ -3,18 +3,26 @@ from bson import ObjectId
 from typing import List, Optional
 from datetime import datetime
 
-from app.core.domain.agent_model import AgentCreate, Document, AgentUpdate
+from app.core.domain.agent_model import Agent, AgentCreate, Document, AgentUpdate
 
 class AgentRepository:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.agents
 
     async def create_agent(self, agent_data: AgentCreate) -> dict:
+        # 1. Convierte el modelo de entrada (solo name y prompt) a un diccionario.
         agent_dict = agent_data.model_dump()
+        
+        # 2. ¡Aquí está la clave! Añade los campos que el servidor debe gestionar.
         agent_dict["created_at"] = datetime.utcnow()
-        agent_dict["documents"] = []
+        agent_dict["documents"] = [] # Inicializa la lista de documentos vacía.
+        
+        # 3. Inserta el diccionario completo en la base de datos.
         result = await self.collection.insert_one(agent_dict)
+        
+        # 4. Busca y devuelve el documento recién creado.
         created_agent = await self.collection.find_one({"_id": result.inserted_id})
+        
         return created_agent
 
     async def find_agent_by_id(self, agent_id: str) -> Optional[dict]:
