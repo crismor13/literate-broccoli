@@ -1,25 +1,28 @@
+# app/infrastructure/vector_store.py
 import os
 from pymongo import MongoClient
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from langchain_openai import OpenAIEmbeddings
 
-# Conexión a la base de datos
-client = MongoClient(os.getenv("MONGO_URI"))
-db_name = os.getenv("MONGO_DB_NAME")
-collection_name = "knowledge_vectors" # La colección que configuraste en Atlas Search
-collection = client[db_name][collection_name]
+# Solo define las constantes aquí
+DB_NAME = os.getenv("MONGO_DB_NAME")
+COLLECTION_NAME = "knowledge_vectors"
+INDEX_NAME = "vector_index"
+MONGO_URI = os.getenv("MONGO_URI")
 
-# Modelo de Embeddings
-# Usamos el modelo más reciente y eficiente de OpenAI
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-# Función para obtener la Vector Store
 def get_vector_store() -> MongoDBAtlasVectorSearch:
     """
     Inicializa y devuelve una instancia de MongoDBAtlasVectorSearch.
+    La conexión se crea cuando se llama a la función.
     """
+    # La conexión y los clientes se crean aquí, no al importar el archivo
+    client = MongoClient(MONGO_URI)
+    collection = client[DB_NAME][COLLECTION_NAME]
+    
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+    
     return MongoDBAtlasVectorSearch(
         collection=collection,
         embedding=embeddings,
-        index_name="vector_index" # El nombre que le diste al índice en Atlas
+        index_name=INDEX_NAME
     )
