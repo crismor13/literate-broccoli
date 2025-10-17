@@ -13,9 +13,11 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from app.infrastructure.vector_store import get_vector_store
 from app.core.domain.agent_model import ChatQuery, ChatResponse
 from app.infrastructure.database import get_db
+from app.core.ports.agent_repository_port import IAgentRepository     
+from app.core.ports.storage_repository_port import IStorageRepository  
 
 class AgentService:
-    def __init__(self, agent_repo: AgentRepository, storage_repo: StorageRepository):
+    def __init__(self, agent_repo: IAgentRepository, storage_repo: IStorageRepository):
         self.agent_repo = agent_repo
         self.storage_repo = storage_repo
 

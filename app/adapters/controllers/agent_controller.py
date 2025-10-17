@@ -9,6 +9,8 @@ from app.infrastructure.database import get_db
 from app.infrastructure.storage import get_blob_service_client
 from fastapi import BackgroundTasks
 from app.core.domain.agent_model import ChatQuery, ChatResponse
+from app.adapters.repositories.agent_repository import AgentRepository # Se instancian los adaptadores concretos
+from app.adapters.repositories.storage_repository import StorageRepository
 
 router = APIRouter(
     prefix="/agents",
@@ -22,6 +24,8 @@ def get_agent_service(
 ) -> AgentService:
     agent_repo = AgentRepository(db)
     storage_repo = StorageRepository(blob_client)
+    # El AgentService pide un IAgentRepository, y tú le das un AgentRepository
+    # que ES un IAgentRepository. ¡Funciona perfecto!
     return AgentService(agent_repo, storage_repo)
 
 

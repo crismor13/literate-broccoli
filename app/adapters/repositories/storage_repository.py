@@ -1,9 +1,10 @@
 import os
 from azure.storage.blob.aio import BlobServiceClient
+from app.core.ports.storage_repository_port import IStorageRepository
 
 AZURE_CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME", "knowledge-base")
 
-class StorageRepository:
+class StorageRepository(IStorageRepository):
     def __init__(self, client: BlobServiceClient):
         self.client = client
 

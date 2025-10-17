@@ -4,8 +4,9 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.domain.agent_model import Agent, AgentCreate, Document, AgentUpdate
+from app.core.ports.agent_repository_port import IAgentRepository
 
-class AgentRepository:
+class AgentRepository(IAgentRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         self.collection = db.agents
 

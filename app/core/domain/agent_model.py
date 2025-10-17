@@ -34,7 +34,7 @@ class Agent(AgentBase):
         }
 
 class AgentList(BaseModel):
-    id: str = Field(alias="_id")
+    id: PyObjectId = Field(alias="_id")
     name: str
     prompt: str
     document_count: int
