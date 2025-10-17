@@ -8,6 +8,7 @@ from app.adapters.repositories.storage_repository import StorageRepository
 from app.infrastructure.database import get_db
 from app.infrastructure.storage import get_blob_service_client
 from fastapi import BackgroundTasks
+from app.core.domain.agent_model import ChatQuery, ChatResponse
 
 router = APIRouter(
     prefix="/agents",
@@ -106,3 +107,14 @@ async def delete_agent(
     Elimina un agente y todos sus archivos asociados.
     """
     return await service.delete_agent(agent_id)
+
+@router.post("/{agent_id}/chat", response_model=ChatResponse)
+async def chat_with_agent(
+    agent_id: str,
+    chat_query: ChatQuery,
+    service: AgentService = Depends(get_agent_service)
+):
+    """
+    Permite conversar con un agente usando su base de conocimiento (RAG).
+    """
+    return await service.chat_with_agent(agent_id, chat_query)
