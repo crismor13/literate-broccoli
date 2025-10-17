@@ -6,3 +6,11 @@ motor
 pymongo
 azure-storage-blob
 python-multipart
+langchain
+langchain-openai
+langchain-mongodb
+tiktoken
+pypdf
+python-docx
+openpyxl
+python-pptx
