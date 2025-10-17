@@ -1,15 +1,11 @@
+# app/core/services/rag_processor.py
 import tempfile
-import requests
-from langchain_community.document_loaders import (
-    PyPDFLoader, 
-    UnstructuredWordDocumentLoader, 
-    UnstructuredExcelLoader, 
-    UnstructuredPowerPointLoader
-)
+import os
+from langchain_community.document_loaders import PyPDFLoader, UnstructuredWordDocumentLoader, UnstructuredExcelLoader, UnstructuredPowerPointLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from app.infrastructure.vector_store import get_vector_store
 
-# Mapeo de extensiones a cargadores de documentos
 LOADER_MAPPING = {
     ".pdf": PyPDFLoader,
     ".docx": UnstructuredWordDocumentLoader,
@@ -17,47 +13,55 @@ LOADER_MAPPING = {
     ".pptx": UnstructuredPowerPointLoader,
 }
 
-def process_and_embed_document(document_url: str, agent_id: str, file_name: str):
-    """
-    Proceso completo de RAG:
-    1. Descarga el archivo desde una URL.
-    2. Lo carga en memoria según su tipo.
-    3. Lo divide en chunks.
-    4. Crea embeddings y los guarda en la base de datos vectorial.
-    """
+async def process_and_embed_document(file_content: bytes, agent_id: str, file_name: str):
+    print("\n--- INICIANDO PROCESO DE RAG ---")
+    temp_file_path = None
     try:
-        # Extrae la extensión para seleccionar el cargador adecuado
         file_extension = f".{file_name.rsplit('.', 1)[1].lower()}"
         if file_extension not in LOADER_MAPPING:
-            print(f"Error: Tipo de archivo no soportado {file_extension}")
+            print(f"  [ERROR] Tipo de archivo no soportado: {file_extension}")
             return
 
-        # Descarga el archivo a un directorio temporal
-        response = requests.get(document_url)
-        response.raise_for_status() # Lanza un error si la descarga falla
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+            temp_file.write(file_content)
+            temp_file_path = temp_file.name
+        print(f"  [PASO 1/4] Archivo temporal creado en: {temp_file_path}")
 
-        with tempfile.NamedTemporaryFile(delete=True, suffix=file_extension) as temp_file:
-            temp_file.write(response.content)
-            temp_file.flush()
+        loader = LOADER_MAPPING[file_extension](temp_file_path)
+        documents = loader.load()
+        print(f"  [PASO 2/4] Documento cargado. Número de páginas/secciones: {len(documents)}")
 
-            # 1. Carga el documento
-            loader = LOADER_MAPPING[file_extension](temp_file.name)
-            documents = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+        chunks = text_splitter.split_documents(documents)
+        print(f"  [PASO 3/4] Documento dividido en {len(chunks)} chunks.")
 
-            # 2. Divide el documento en chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
-            chunks = text_splitter.split_documents(documents)
+        # Creamos una nueva lista para nuestros documentos limpios.
+        cleaned_chunks = []
+        for chunk in chunks:
+            # Para cada chunk, creamos un nuevo objeto Document
+            # que solo contiene el contenido y la metadata que nosotros controlamos.
+            new_chunk = Document(
+                page_content=chunk.page_content,
+                metadata={
+                    'source': file_name,  # Usamos el nombre original del archivo
+                    'agent_id': agent_id
+                }
+            )
+            cleaned_chunks.append(new_chunk)
+        
+        print("  [PASO 4/4] Chunks limpiados y preparados con la metadata correcta.")
 
-            # 3. Añade metadatos cruciales a cada chunk para poder filtrar
-            for chunk in chunks:
-                chunk.metadata["agent_id"] = agent_id
-                chunk.metadata["source"] = file_name
-            
-            # 4. Obtiene la vector store y guarda los chunks
-            vector_store = get_vector_store()
-            vector_store.add_documents(chunks)
-            print(f"Documento '{file_name}' procesado y vectorizado para el agente {agent_id}.")
+        vector_store = get_vector_store()
+        print("  Intentando guardar chunks limpios en la base de datos vectorial...")
+        
+        # Usamos la versión asíncrona para no bloquear
+        await vector_store.aadd_documents(cleaned_chunks)
+        
+        print("  ✅ ¡ÉXITO! Los chunks fueron procesados y guardados en la base de datos.")
+        print("--- FIN DEL PROCESO DE RAG ---\n")
 
     except Exception as e:
-        # Es importante registrar el error en un sistema de logging real
-        print(f"Error procesando el documento {file_name} para el agente {agent_id}: {e}")
+        print(f"  🚨🚨🚨 ERROR CRÍTICO durante el proceso de RAG: {e}")
+    finally:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
