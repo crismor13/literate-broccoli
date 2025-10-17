@@ -7,6 +7,7 @@ from app.adapters.repositories.agent_repository import AgentRepository
 from app.adapters.repositories.storage_repository import StorageRepository
 from app.infrastructure.database import get_db
 from app.infrastructure.storage import get_blob_service_client
+from fastapi import BackgroundTasks
 
 router = APIRouter(
     prefix="/agents",
@@ -70,6 +71,7 @@ async def update_agent(
 @router.post("/{agent_id}/documents", response_model=Agent)
 async def upload_agent_document(
     agent_id: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     service: AgentService = Depends(get_agent_service)
 ):
@@ -82,7 +84,7 @@ async def upload_agent_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File extension not allowed. Allowed extensions are: {', '.join(ALLOWED_EXTENSIONS)}"
         )
-    return await service.upload_document(agent_id, file)
+    return await service.upload_document(agent_id, file, background_tasks)
 
 @router.delete("/{agent_id}/documents/{file_name}", status_code=status.HTTP_200_OK)
 async def delete_agent_document(
