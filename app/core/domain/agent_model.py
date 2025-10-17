@@ -37,3 +37,10 @@ class AgentList(BaseModel):
 class AgentUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=3)
     prompt: Optional[str] = Field(None, min_length=10)
+
+class ChatQuery(BaseModel):
+    query: str = Field(..., min_length=1, description="Pregunta del usuario")
+
+class ChatResponse(BaseModel):
+    answer: str
+    retrieved_sources: List[str] # Para saber qué documentos se usaron
