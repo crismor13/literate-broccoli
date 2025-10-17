@@ -4,6 +4,8 @@ from typing import List
 from app.core.domain.agent_model import AgentCreate, Agent, Document, AgentUpdate, AgentList
 from app.adapters.repositories.agent_repository import AgentRepository
 from app.adapters.repositories.storage_repository import StorageRepository
+from fastapi import BackgroundTasks 
+from .rag_processor import process_and_embed_document
 
 class AgentService:
     def __init__(self, agent_repo: AgentRepository, storage_repo: StorageRepository):
@@ -32,7 +34,7 @@ class AgentService:
         updated_agent = await self.agent_repo.update_agent(agent_id, update_data)
         return Agent.model_validate(updated_agent)
 
-    async def upload_document(self, agent_id: str, file: UploadFile) -> Agent:
+    async def upload_document(self, agent_id: str, file: UploadFile, background_tasks: BackgroundTasks) -> Agent:
         # Verifica que el agente exista
         agent = await self.get_agent_by_id(agent_id)
         
@@ -43,6 +45,13 @@ class AgentService:
         # Crea el objeto Document y lo añade a la base de datos
         new_document = Document(file_name=file.filename, url=file_url)
         await self.agent_repo.add_document_to_agent(agent_id, new_document)
+
+        background_tasks.add_task(
+            process_and_embed_document, 
+            document_url=file_url, 
+            agent_id=agent_id, 
+            file_name=file.filename
+        )
         
         # Devuelve el agente actualizado
         return await self.get_agent_by_id(agent_id)
