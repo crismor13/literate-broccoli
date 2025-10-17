@@ -1,9 +1,8 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from app.adapters.controllers import agent_controller
-from dotenv import load_dotenv
-
-# Cargar variables de entorno desde el archivo .env
-load_dotenv()
 
 app = FastAPI(
     title="Gestor de Agentes de IA",
